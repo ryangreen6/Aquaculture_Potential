@@ -1,0 +1,530 @@
+---
+title: "Homework Assignment #4"
+subtitle: "Identifying Suitable EEZs for Oysters and Pacific Herring"
+author: "Ryan Green"
+date: 11/30/24
+execute:
+  warning: false
+  message: false
+  results: hide
+format:
+  html:
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+For this assignment, I will identify the most suitable Exclusive Economic Zones (EEZ) on the West Coast of the US for developing marine aquaculture for oysters and Pacific herring (*Clupea pallasii*). Ideal EEZs will be determined based on the range of suitable Sea Surface Temperatures (SST) and depth ranges for each. 
+
+
+## Initial Data Loading and Manipulation
+
+```{r, Loading Libraries}
+# Loading Libraries
+library(sf) 
+library(tmap)
+library(here)
+library(terra)
+library(stars)
+library(dplyr)
+library(raster)
+library(tidyverse)
+library(RColorBrewer)
+```
+
+```{r, Loading Data, results='hide'}
+# Loading in all data
+depth <- rast(here::here("data", "depth.tif"))
+
+eez <- st_read(here::here("data", "wc_regions_clean.shp"))
+
+sst08 <- rast(here::here("data", "average_annual_sst_2008.tif"))
+sst09 <- rast(here::here("data", "average_annual_sst_2009.tif"))
+sst10 <- rast(here::here("data", "average_annual_sst_2010.tif"))
+sst11 <- rast(here::here("data", "average_annual_sst_2011.tif"))
+sst12 <- rast(here::here("data", "average_annual_sst_2012.tif"))
+```
+
+```{r, CRS Transformation, results='hide'}
+# Reprojecting all rasters to the same CRS
+sst08 <- terra::project(sst08, "EPSG:4326")
+sst09 <- terra::project(sst09, "EPSG:4326")
+sst10 <- terra::project(sst10, "EPSG:4326")
+sst11 <- terra::project(sst11, "EPSG:4326")
+sst12 <- terra::project(sst12, "EPSG:4326")
+elevation <- terra::project(depth, "EPSG:4326")
+eez <- st_transform(eez, crs = 4326)
+```
+
+```{r, CRS Check}
+# Checking and converting CRS of SST rasters
+rasters <- list(sst08, sst09, sst10, sst11, sst12, elevation)
+names(rasters) <- c("sst08", "sst09", "sst10", "sst11", "sst12", "elevation")
+
+for (i in seq_along(rasters)) {
+  if (st_crs(rasters[[i]]) != st_crs(4326)) {
+    message(paste("Reprojection of", names(rasters)[i], "FAILED"))
+  } else {
+    message(paste("CRS of", names(rasters)[i], "CONFIRMED as EPSG:4326"))
+  }
+}
+
+if (st_crs(eez)$epsg == 4326) {
+  message("CRS of eez CONFIRMED as EPSG:4326")
+} else {
+  message("Reprojection of 'eez' FAILED")
+}
+```
+
+```{r, Calculate and Resample Mean SST}
+# Stacking the SST rasters together
+sst_stack <- rast(list(sst08, sst09, sst10, sst11, sst12))
+
+# Finding the mean SST from the raster stack, and converting from Kelvin to Celsius
+mean_sst <- mean(sst_stack, na.rm = TRUE) - 273.5
+
+# Cropping the elevation/bathymetry raster to the same extent as the SST raster
+elevation <- crop(elevation, ext(mean_sst))
+
+# Resampling the elevation raster based on mean_sst
+elevation <- resample(elevation, mean_sst, method = "near")
+```
+
+## Elevation and Bathymetry Map
+
+```{r, Bathymetry, Elevation Map Setup}
+# Creating custom breaks for elevations above and below zero, for color mapping
+below_zero_breaks <- c(-6000, -5500, -5000, -4500, -4000, -3500, -3000, -2500, -2000, -1500, -1000, -500, -400, -300, -200, -100, 0)
+above_zero_breaks <- c(0, 25, 50, 75, 100, 200, 300, 400, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 5600, 7000)
+
+# Setting the colors
+below_zero_palette <- colorRampPalette(c("#07073D", "royalblue2"))(length(below_zero_breaks) - 1)
+above_zero_palette <- colorRampPalette(c("#5C653F", "#323615", "aliceblue"))(length(above_zero_breaks) - 1)
+
+# Combining the breaks into a single object
+breaks <- c(below_zero_breaks, above_zero_breaks[-1])
+
+# Combining the palette into a single object
+palette <- c(below_zero_palette, above_zero_palette)
+```
+
+```{r, Map of Bathymetry and Elevation, fig.height=8.7, fig.width=7.9, fig.align='center'}
+#| code-fold: TRUE 
+#| collapse: TRUE
+
+tm_shape(elevation) +
+  tm_raster(palette = palette, 
+            breaks = breaks, 
+            title = "Elevation (m)", 
+            style = "fixed",
+            legend.reverse = TRUE) +
+tm_layout(legend.outside = TRUE,
+          frame = TRUE,
+          bg.color = "grey12",
+          main.title = "West Coast Elevation and Bathymetry",
+          main.title.position = c(0.14, 1),
+          main.title.size = 1.2,
+          inner.margins = c(0, 0, 0, 0),
+          outer.margins = c(0, 0, 0, 0),
+          asp = 0) +
+tm_scale_bar(text.color = "#F6EAC7",
+             color.dark = "#665A47",
+             color.light = "#F6EAC7",
+             position = c(0.07, 0.02),
+             width = 0.3) +
+tm_compass(type = "arrow",
+           size = 1.5,
+           position = c(0.06, 0.06),
+           text.color = "#F6EAC7",
+           color.dark = "#665A47",
+           color.light = "#F6EAC7") 
+```
+
+```{r, Map of Mean SST Setup}
+# Making a copy of elevation, just for land area
+land <- elevation
+
+# Isolating land area by removing any elevation below 0
+land[land <= 0] <- NA
+
+# Setting a custom palette for land elevation, this time in grey
+above_zero_palette_greys <- colorRampPalette(c("grey40", "grey90"))(length(above_zero_breaks) - 1)
+
+# Creating custom breaks and color palette for the sea surface temperature
+temp_breaks <- seq(from = 0, to = 20, by = 1)
+temp_palette <- colorRampPalette(c("aliceblue", "darkred"))(length(temp_breaks) - 1)
+```
+
+## Sea Surface Temperature Map
+
+```{r, Map of Mean SST, fig.height=8.7, fig.width=7.8, fig.align='center'}
+#| code-fold: TRUE 
+#| collapse: TRUE
+
+tm_shape(land) +
+  tm_raster(palette = above_zero_palette_greys, 
+            breaks = above_zero_breaks, 
+            title = "Elevation (m)", 
+            style = "fixed",
+            legend.show = FALSE) +
+tm_shape(mean_sst) +
+  tm_raster(palette = temp_palette, 
+            breaks = temp_breaks, 
+            title = "Mean SST (C)",
+            legend.reverse = TRUE) +
+tm_layout(legend.outside = TRUE,
+          frame = TRUE,
+          bg.color = "grey40",
+          main.title = "West Coast Mean Sea Surface Temperature",
+          main.title.position = c(0.14, 1),
+          main.title.size = 1.2,
+          inner.margins = c(0, 0, 0, 0),
+          outer.margins = c(0, 0, 0, 0),
+          asp = 0) +
+tm_scale_bar(text.color = "aliceblue",
+             color.dark = "black",
+             color.light = "aliceblue",
+             position = c(0.07, 0.02),
+             width = 0.3) +
+tm_compass(type = "arrow",
+           size = 1.5,
+           position = c(0.06, 0.06),
+           text.color = "aliceblue",
+           color.dark = "black",
+           color.light = "aliceblue") 
+```
+
+
+## Oyster Aquaculture
+
+```{r, Oyster Temp}
+# Making a copy of mean_sst, just for our oysters :)
+oyster_temp <- mean_sst
+
+# Establishing reclassification matrix for oyster_temp
+rcl_temp <- matrix(c(-Inf, 11, 1,
+                11, 30, 0,
+                30, Inf, 1), 
+                ncol = 3, byrow = TRUE)
+
+# Reclassifying oyster_temp based on the matrix
+oyster_temp <- classify(oyster_temp, rcl = rcl_temp)
+
+# Overwriting oyster_temp values as factor
+oyster_temp <- as.factor(oyster_temp)
+```
+
+```{r, Oyster Depth}
+# Just like oyster_temp, copying the elevation raster for oyster_depth
+oyster_depth <- elevation
+
+# Establishing reclassification matrix for oyster_depth
+rcl_depth_fun <- matrix(c(-Inf, -70, 0,
+                -70, 0, 1,
+                0, Inf, 0), 
+                ncol = 3, byrow = TRUE)
+
+# Reclassifying oyster_depth based on the matrix
+oyster_depth <- classify(oyster_depth, rcl = rcl_depth_fun)
+
+# Overwriting oyster_depth values as factor
+oyster_depth <- as.factor(oyster_depth)
+```
+
+```{r, Oyster Checks}
+# Running CRS, Extent, Resolution, and NA values checks for oyster_temp and oyster_depth
+checks <- list(
+  Extent_Check = ext(oyster_temp) == ext(oyster_depth),
+  Resolution_Check = res(oyster_temp) == res(oyster_depth),
+  CRS_Check = crs(oyster_temp) == crs(oyster_depth),
+  NaN_Temp_Check = !any(is.nan(values(oyster_temp))),
+  NaN_Depth_Check = !any(is.nan(values(oyster_depth)))
+)
+
+for (check_name in names(checks)) {
+  check_result <- checks[[check_name]]
+  print(paste(check_name, ":", check_result))
+}
+
+if (all(c(checks$ext_check, checks$res_check, checks$crs_check) == TRUE) &
+    all(c(checks$nan_check_temp, checks$nan_check_depth) == TRUE)) {
+  print("Checks passed")
+} else {
+  print("Checks failed")
+}
+```
+
+```{r, Oyster Territory Raster}
+# Finding suitable oyster territory based on depth and temp
+oyster_territory <- (oyster_depth * oyster_temp)
+
+# Saving as factor
+oyster_territory <- as.factor(oyster_territory)
+
+# Setting 0 values to NA, to only get the suitable area in the oyster_territory raster
+values(oyster_territory)[values(oyster_territory) == 0] <- NA
+
+# Transforming eez to the same CRS as oyster_territory
+eez <- st_transform(eez, crs = crs(oyster_territory))
+
+# Rasterizing eez
+eez_raster <- rasterize(eez, oyster_territory, field = "rgn_id")
+
+# Finding the suitable territory within each eez
+oyster_territory <- (oyster_territory * eez_raster)
+```
+
+## Oyster Aquaculture EEZ Suitability Table
+
+```{r, Oyster Territory Info}
+# Reprojecting oyster_territory to a CRS that uses square meters, rather than degrees
+oyster_territory <- project(oyster_territory, "EPSG:3395")
+
+# Finding resolution of oyster_territory_m
+cell_size <- res(oyster_territory)
+
+# Calculating area of a single cell
+cell_area_m2 <- prod(cell_size)
+
+# Converting to square KM
+cell_area_km2 <- cell_area_m2 / 1000000
+
+# Getting the count of each unique value in oyster_territory_m
+value_counts_oyster <- freq(oyster_territory)
+
+# Calculating total area for each value
+value_counts_oyster$area_km2_o <- value_counts_oyster$count * cell_area_km2
+
+# Renaming column referring to EEZ to "rgn_id", so that I can join the region names to this dataframe
+colnames(value_counts_oyster)[colnames(value_counts_oyster) == "value"] <- "rgn_id"
+
+# Dropping eez geometry to make it a dataframe
+region_info <- eez %>%
+  st_drop_geometry()
+
+# Joining region_info with value_counts_oyster to add region names to the dataframe
+value_counts_oyster <- region_info %>%
+  left_join(value_counts_oyster, by = "rgn_id") %>%
+  dplyr::select(-area_m2, -area_km2, -layer, -rgn_key) %>%
+  mutate(across(everything(), ~replace(., is.na(.), 0)))
+
+# Joining the oyster value counts to eez_all, a dataframe used for making map labels
+eez_all <- eez %>%
+  left_join(value_counts_oyster, by = "rgn_id")
+
+# Creating combined map labels with region name and code
+eez_all$combined_labels <- paste(eez_all$rgn.y, eez_all$rgn_key, sep = "\n")
+
+# Making a nice kable table, nice!
+kableExtra::kable(value_counts_oyster, 
+                  format = "simple", 
+                  col.names = c("Region", 
+                                "Region ID", 
+                                "Cell Count", 
+                                "Area, Km²"), 
+                  caption = "Suitable Oyster Cultivation Territory in West Coast EEZs",
+                  align = "l",
+                  digits = 2)
+
+```
+
+## Oyster Aquaculture EEZ Map
+
+```{r, Oyster Aquaculture EEZ Map, fig.height=9, fig.width=5.5, fig.align='center'}
+#| code-fold: TRUE 
+#| collapse: TRUE
+
+tm_shape(elevation) +
+  tm_raster(palette = palette, 
+            breaks = breaks, 
+            title = "Elevation (m)", 
+            style = "fixed",
+            alpha = 0.8,
+            legend.show = FALSE) +
+tm_shape(eez_all) +
+  tm_polygons(col = "area_km2_o",
+              palette = "Greens",
+              border.col = "#6A8EAE",
+              lwd = 0.3,
+              alpha = 0.9,
+              title = expression("Suitable Area, Km"^2*"")) +
+  tm_text("combined_labels", 
+          size = 0.5, 
+          col = "midnightblue", 
+          shadow = FALSE, 
+          auto.placement = FALSE) + 
+tm_layout(legend.text.size = 0.6,
+          legend.width = 0.3,
+          legend.position = c(0.72, 0.924),
+          legend.bg.color = "seashell1",
+          frame = TRUE,
+          bg.color = "grey12",
+          main.title = "West Coast EEZ Suitability for\nOyster Aquaculture",
+          main.title.position = c("center", "top"),
+          main.title.size = 1.2,
+          inner.margins = c(0, 0, 0, 0),
+          outer.margins = c(0, 0, 0, 0),
+          asp = 0) +
+tm_scale_bar(text.color = "#F6EAC7",
+             color.dark = "#665A47",
+             color.light = "#F6EAC7",
+             position = c(0.07, 0.02),
+             width = 0.3) +
+tm_compass(type = "arrow",
+           size = 1.5,
+           position = c(0.06, 0.06),
+           text.color = "#F6EAC7",
+           color.dark = "#665A47",
+           color.light = "#F6EAC7") 
+```
+
+
+## Herring Aquaculture
+Finding suitable territory for Herring, using the same steps as the oysters. This code is nearly identical to that of the oysters, so I have omitted comments to keep it neat. 
+
+```{r, Herring Temp}
+herring_temp <- mean_sst
+herring_temp[is.nan(herring_temp)] <- 0
+
+# Slightly different matrix, as herring have different preferred temperatures
+rcl_temp_h <- matrix(c(-Inf, 0, 0,
+                0, 10, 1,
+                10, Inf, 0), 
+                ncol = 3, byrow = TRUE)
+
+herring_temp <- classify(herring_temp, rcl = rcl_temp_h)
+
+herring_temp <- as.factor(herring_temp)
+```
+
+```{r, Herring Depth}
+herring_depth <- elevation
+
+# Slightly different matrix, as herring have different preferred depths
+rcl_depth_fun_h <- matrix(c(-Inf, -1300, 0,
+                -1300, 0, 1,
+                0, Inf, 0), 
+                ncol = 3, byrow = TRUE)
+
+herring_depth <- classify(herring_depth, rcl = rcl_depth_fun_h)
+
+herring_depth <- as.factor(herring_depth)
+```
+
+```{r, Herring Territory Raster}
+herring_territory <- (herring_depth * herring_temp)
+
+herring_territory <- as.factor(herring_territory)
+
+values(herring_territory)[values(herring_territory) == 0] <- NA
+
+eez <- st_transform(eez, crs = crs(herring_territory))
+
+eez_raster <- rasterize(eez, herring_territory, field = "rgn_id")
+
+herring_territory <- (herring_territory * eez_raster)
+```
+
+## Herring Aquaculture EEZ Suitability Table
+
+```{r, Herring Territory Info}
+herring_territory <- project(herring_territory, "EPSG:3395")
+
+cell_size <- res(herring_territory)
+
+cell_area_m2 <- prod(cell_size)
+
+cell_area_km2 <- cell_area_m2 / 1000000
+
+value_counts_herring <- freq(herring_territory)
+
+value_counts_herring$area_km2_h <- value_counts_herring$count * cell_area_km2
+
+colnames(value_counts_herring)[colnames(value_counts_herring) == "value"] <- "rgn_id"
+
+region_info <- eez %>%
+  st_drop_geometry()
+
+value_counts_herring <- region_info %>%
+  left_join(value_counts_herring, by = "rgn_id") %>%
+  dplyr::select(-area_m2, -area_km2, -layer, -rgn_key) %>%
+  mutate(across(everything(), ~replace(., is.na(.), 0)))
+
+eez_all <- eez_all %>%
+   left_join(value_counts_herring, by = "rgn_id")
+ 
+kableExtra::kable(value_counts_herring, 
+                  format = "simple", 
+                  col.names = c("Region", 
+                                "Region ID", 
+                                "Cell Count", 
+                                "Area, Km²"), 
+                  caption = "Suitable Herring Cultivation Territory in West Coast EEZs",
+                  align = "l",
+                  digits = 2)
+```
+
+## Herring Aquaculture EEZ Map
+
+```{r, Herring Aquaculture EEZ Map, fig.height=9, fig.width=5.5, fig.align='center'}
+#| code-fold: TRUE 
+#| collapse: TRUE
+
+tm_shape(elevation) +
+  tm_raster(palette = palette, 
+            breaks = breaks, 
+            title = "Elevation (m)", 
+            style = "fixed",
+            alpha = 0.8,
+            legend.show = FALSE) +
+tm_shape(eez_all) +
+  tm_polygons(col = "area_km2_h",
+              palette = "Greens",
+              border.col = "#6A8EAE",
+              lwd = 0.3,
+              alpha = 0.9,
+              title = expression("Suitable Area, Km"^2*"")) +
+  tm_text("combined_labels", 
+          size = 0.5, 
+          col = "midnightblue", 
+          shadow = FALSE, 
+          auto.placement = FALSE) + 
+tm_layout(legend.text.size = 0.6,
+          legend.width = 0.3,
+          legend.position = c(0.72, 0.884),
+          legend.bg.color = "seashell1",
+          frame = TRUE,
+          bg.color = "grey12",
+          main.title = "West Coast EEZ Suitability for\nHerring Aquaculture",
+          main.title.position = c("center", "top"),
+          main.title.size = 1.2,
+          inner.margins = c(0, 0, 0, 0),
+          outer.margins = c(0, 0, 0, 0),
+          asp = 0) +
+tm_scale_bar(text.color = "#F6EAC7",
+             color.dark = "#665A47",
+             color.light = "#F6EAC7",
+             position = c(0.07, 0.02),
+             width = 0.3) +
+tm_compass(type = "arrow",
+           size = 1.5,
+           position = c(0.06, 0.06),
+           text.color = "#F6EAC7",
+           color.dark = "#665A47",
+           color.light = "#F6EAC7") 
+```
+
+
+# Function
+
+```{r}
+
+
+```
+
+
+
+
+
+
+
