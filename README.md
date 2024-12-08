@@ -10,6 +10,7 @@ The purpose of this repository is to determine which Exclusive Economic Zones (E
 
 - Aquaculture_Potential.rproj
 - Aquaculture_Potential.qmd
+- Aquaculture_Potential.html
 - aquaculture.R
 - README.md
 - .gitignore
