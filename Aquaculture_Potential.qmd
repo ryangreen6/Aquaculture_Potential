@@ -1,5 +1,5 @@
 ---
-title: "Homework Assignment #4"
+title: "Aquaculture Potential"
 subtitle: "Identifying Suitable EEZs for Oysters and Pacific Herring"
 author: "Ryan Green"
 date: 11/30/24
@@ -14,7 +14,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-For this assignment, I will identify the most suitable Exclusive Economic Zones (EEZ) on the West Coast of the US for developing marine aquaculture for oysters and Pacific herring (*Clupea pallasii*). Ideal EEZs will be determined based on the range of suitable Sea Surface Temperatures (SST) and depth ranges for each. 
+In this project, I will identify the most suitable Exclusive Economic Zones (EEZ) on the West Coast of the US for developing marine aquaculture for oysters and Pacific herring (*Clupea pallasii*). Ideal EEZs will be determined based on the range of suitable Sea Surface Temperatures (SST) and depth ranges for each. 
+
+A function will also be made to find suitable EEZs on the West Coast for any species desired. 
 
 
 ## Initial Data Loading and Manipulation
@@ -512,14 +514,6 @@ tm_compass(type = "arrow",
            text.color = "#F6EAC7",
            color.dark = "#665A47",
            color.light = "#F6EAC7") 
-```
-
-
-# Function
-
-```{r}
-
-
 ```
 
 
