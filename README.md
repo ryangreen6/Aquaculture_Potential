@@ -14,6 +14,10 @@ The purpose of this repository is to determine which Exclusive Economic Zones (E
 - README.md
 - .gitignore
 
+## Techniques
+
+This repository mainly involves the aggregating, reclassifying, and masking of raster data. It also involves map making using the package `tmap`. 
+
 ## Data
 The data for this analysis is not included in this repository. 
 
