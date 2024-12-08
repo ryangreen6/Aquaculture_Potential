@@ -7,12 +7,16 @@ The purpose of this repository is to determine which Exclusive Economic Zones (E
 
 
 ## Within this repository:
-- EJ_Pattern_LA.qmd
-- EJ_Pattern_LA.rproj
+
+- Aquaculture_Potential.rproj
+- Aquaculture_Potential.qmd
+- aquaculture.R
 - README.md
 - .gitignore
 
 ## Data
+
+- Sea Surface Temperature (SST) - Five rasters of SST (years 2008-2012) were aggregated to provide a recent average SST for the West Coast. 
 
 
 ## Acknowledgements
