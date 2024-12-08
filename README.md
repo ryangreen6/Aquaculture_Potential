@@ -15,8 +15,13 @@ The purpose of this repository is to determine which Exclusive Economic Zones (E
 - .gitignore
 
 ## Data
+The data for this analysis is not included in this repository. 
 
-- Sea Surface Temperature (SST) - Five rasters of SST (years 2008-2012) were aggregated to provide a recent average SST for the West Coast. 
+- Sea Surface Temperature (SST) - Five rasters of SST (years 2008-2012) were aggregated to provide a recent average SST for the West Coast. The data was originally generated from NOAA’s 5km Daily Global Satellite Sea Surface Temperature Anomaly v3.1. The data can be downloaded here: https://coralreefwatch.noaa.gov/product/5km/index_5km_ssta.php
+
+- Bathymetry - Ocean depth was characterized using data from General Bathymetric Chart of the Oceans (GEBCO). The data can be downloaded here: https://www.gebco.net/data_and_products/gridded_bathymetry_data/#area
+
+- Exclusive Economic Zones (EEZs) - Marine boundaries for EEZs are available as shapefiles from Marineregions.org. The data can be downloaded here: https://www.marineregions.org/eez.php
 
 
 ## Acknowledgements
