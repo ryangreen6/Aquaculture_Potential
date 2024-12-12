@@ -1,6 +1,6 @@
 ---
 title: "Aquaculture Potential"
-subtitle: "Identifying Suitable EEZs for Oysters and Pacific Herring"
+subtitle: "Identifying Suitable EEZs North American Coastal Species"
 author: "Ryan Green"
 date: 11/30/24
 execute:
@@ -14,9 +14,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-In this project, I will identify the most suitable Exclusive Economic Zones (EEZ) on the West Coast of the US for developing marine aquaculture for oysters and Pacific herring (*Clupea pallasii*). Ideal EEZs will be determined based on the range of suitable Sea Surface Temperatures (SST) and depth ranges for each. 
+For this assignment, I will identify the most suitable Exclusive Economic Zones (EEZ) on the West Coast of the US for developing marine aquaculture for oysters and Pacific herring (*Clupea pallasii*). Ideal EEZs will be determined based on the range of suitable Sea Surface Temperatures (SST) and depth ranges for each. 
 
-A function will also be made to find suitable EEZs on the West Coast for any species desired. 
+I have also included a function called `aquaculture` that can find the best EEZ for your chosen species!
 
 
 ## Initial Data Loading and Manipulation
@@ -32,6 +32,10 @@ library(dplyr)
 library(raster)
 library(tidyverse)
 library(RColorBrewer)
+```
+
+```{r, Loading Aquaculture Function}
+source("aquaculture.R")
 ```
 
 ```{r, Loading Data, results='hide'}
@@ -196,6 +200,13 @@ tm_compass(type = "arrow",
            color.light = "aliceblue") 
 ```
 
+# Function
+Try our new and improved function! Input the preferred temperature and depth ranges of your given species, and see a map of the best EEZ. See some example functions below:
+```{r, Function, fig.height=8.7, fig.width=5.5, fig.align='center'}
+aquaculture(0, 20, 70, 600)
+aquaculture(11, 18, 0, 80)
+aquaculture(4, 10, 1, 60)
+```
 
 ## Oyster Aquaculture
 
